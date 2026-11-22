@@ -1,0 +1,9 @@
+streamlit
+pandas
+ortools
+openpyxl
+reportlab
+ttkbootstrap
+generativeai
+dotenv
+cryptography
