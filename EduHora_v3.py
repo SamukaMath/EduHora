@@ -5,9 +5,11 @@ from ttkbootstrap.constants import *
 import threading
 import json
 import re
+import sys
 import webbrowser
 from urllib.parse import quote
 from licenca import ativar_licenca, obter_machine_id, validar_licenca
+from atualizador import VERSAO_APP, verificar_atualizacao, iniciar_atualizacao
 
 class AppHorariosPro:
     def __init__(self, root):
@@ -48,6 +50,7 @@ class AppHorariosPro:
         ]
 
         self.configurar_menu()
+        self.root.after(15000, self.verificar_atualizacoes_silenciosas)
 
         self.cabecalho = ttk.Frame(root, style="Header.TFrame", padding=(24, 16))
         self.cabecalho.pack(fill='x', padx=15, pady=(15, 0))
@@ -714,6 +717,7 @@ class AppHorariosPro:
         sobre_menu = tk.Menu(menu_bar, tearoff=0)
         sobre_menu.add_command(label="Sobre o Sistema", command=self.abrir_janela_sobre)
         sobre_menu.add_command(label="Licença / Assinatura...", command=self.abrir_janela_licenca)
+        sobre_menu.add_command(label="Verificar Atualizações", command=self.verificar_atualizacoes_manual)
         menu_bar.add_cascade(label="Sobre", menu=sobre_menu)
         
         self.root.config(menu=menu_bar)
@@ -733,6 +737,68 @@ class AppHorariosPro:
             texto = f"Licença não ativa — {dados}"
             bootstyle = "danger"
         self.lbl_status_licenca.configure(text=texto, bootstyle=bootstyle)
+
+    def verificar_atualizacoes_silenciosas(self):
+        threading.Thread(
+            target=self._processar_verificacao_atualizacao,
+            kwargs={"manual": False},
+            daemon=True,
+        ).start()
+
+    def verificar_atualizacoes_manual(self):
+        threading.Thread(
+            target=self._processar_verificacao_atualizacao,
+            kwargs={"manual": True},
+            daemon=True,
+        ).start()
+
+    def _processar_verificacao_atualizacao(self, manual=False):
+        try:
+            atualizacao = verificar_atualizacao()
+            if atualizacao is None:
+                if manual:
+                    self.root.after(
+                        0,
+                        lambda: messagebox.showinfo(
+                            "Atualizações",
+                            f"Você já está usando a versão mais recente ({VERSAO_APP}).",
+                        ),
+                    )
+                return
+
+            if not getattr(sys, "frozen", False):
+                if manual:
+                    self.root.after(
+                        0,
+                        lambda: messagebox.showinfo(
+                            "Atualização disponível",
+                            f"Nova versão: {atualizacao['versao']}\n"
+                            "A instalação automática está disponível apenas no executável.",
+                        ),
+                    )
+                return
+
+            ok, mensagem = iniciar_atualizacao(
+                atualizacao["url"],
+                atualizacao["nome"],
+            )
+            if manual or ok:
+                self.root.after(
+                    0,
+                    lambda: messagebox.showinfo(
+                        "Atualização",
+                        f"{mensagem}\nNova versão: {atualizacao['versao']}",
+                    ),
+                )
+        except Exception as exc:
+            if manual:
+                self.root.after(
+                    0,
+                    lambda: messagebox.showwarning(
+                        "Atualização",
+                        f"Não foi possível verificar:\n{exc}",
+                    ),
+                )
 
     def salvar_projeto(self):
         dados = {
@@ -879,7 +945,7 @@ class AppHorariosPro:
         ttk.Label(janela_sobre, text="Gerador de Horários Escolar", font=("Arial", 10, "italic")).pack(pady=(0, 15))
         
         # Detalhes (Substitua os textos abaixo pelos seus dados reais)
-        ttk.Label(janela_sobre, text="Versão: 1.1.2", font=("Arial", 10)).pack(pady=2)
+        ttk.Label(janela_sobre, text=f"Versão: {VERSAO_APP}", font=("Arial", 10)).pack(pady=2)
         ttk.Label(janela_sobre, text="Criador: Samuel de Sousa Apolinário", font=("Arial", 10)).pack(pady=2)
         ttk.Label(janela_sobre, text="contato: prof.samuelapolinario@gmail.com", font=("Arial", 10)).pack(pady=2)
         
@@ -3084,7 +3150,7 @@ def iniciar_splash_na_root(root):
     tk.Frame(painel, width=520, height=1, bg="#e5ebf1").place(x=38, y=246)
     tk.Label(
         painel,
-        text="Versão 1.1.2",
+        text=f"Versão {VERSAO_APP}",
         bg="#ffffff",
         fg="#78909c",
         font=("Segoe UI", 8),
