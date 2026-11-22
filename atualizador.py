@@ -6,13 +6,15 @@ import subprocess
 import sys
 import tempfile
 import time
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
 
-VERSAO_APP = "1.1.3"
+from version import VERSAO_APP
 REPOSITORIO_GITHUB = "SamukaMath/EduHora"
 API_RELEASES = f"https://api.github.com/repos/{REPOSITORIO_GITHUB}/releases/latest"
+PASTA_DRIVE_URL = "https://drive.google.com/drive/folders/1MDZXoKB9XYCLbC3g-K9fQ55uqkjaeKVD"
 
 
 def normalizar_versao(valor):
@@ -36,6 +38,15 @@ def baixar_json(url, timeout=12):
 
 
 def verificar_atualizacao():
+    return {
+        "pasta": PASTA_DRIVE_URL,
+        "requer_manual": True,
+        "versao": None,
+        "nome": "Pasta do Google Drive",
+    }
+
+
+def verificar_atualizacao_github():
     release = baixar_json(API_RELEASES)
     versao_nova = str(release.get("tag_name") or "").strip()
     if normalizar_versao(versao_nova) <= normalizar_versao(VERSAO_APP):
@@ -58,6 +69,83 @@ def verificar_atualizacao():
         "nome": candidato["name"],
         "url": candidato["browser_download_url"],
         "notas": str(release.get("body") or "").strip(),
+    }
+
+
+def verificar_atualizacao_drive():
+    pasta_id = PASTA_DRIVE_URL.rsplit("/", 1)[-1]
+    try:
+        requisicao = Request(
+            PASTA_DRIVE_URL,
+            headers={"User-Agent": "EduHora-Updater"},
+        )
+        with urlopen(requisicao, timeout=12) as resposta:
+            html = resposta.read().decode("utf-8", errors="ignore")
+
+        arquivos = re.findall(
+            r"(EduHora[_\s-]*v?(\d+(?:\.\d+)*)\.rar)",
+            html,
+            flags=re.IGNORECASE,
+        )
+        if not arquivos:
+            return _verificar_por_indice_direto(
+                f"https://drive.google.com/uc?id={pasta_id}&export=download"
+            )
+
+        candidatos = []
+        for nome_match, versao in arquivos:
+            nome = nome_match
+            candidatos.append((normalizar_versao(versao), versao, nome))
+
+        candidatos.sort(reverse=True)
+        maior_normalizada, versao_nova, nome = candidatos[0]
+        if maior_normalizada <= normalizar_versao(VERSAO_APP):
+            return None
+
+        return {
+            "versao": versao_nova,
+            "nome": nome,
+            "url": None,
+            "pasta": PASTA_DRIVE_URL,
+            "requer_manual": True,
+            "notas": "",
+        }
+    except Exception:
+        return {
+            "pasta": PASTA_DRIVE_URL,
+            "requer_manual": True,
+            "versao": None,
+            "nome": "Pasta do Google Drive",
+        }
+
+
+def _verificar_por_indice_direto(indice_url):
+    requisicao = Request(
+        indice_url,
+        headers={"User-Agent": "EduHora-Updater"},
+    )
+    with urlopen(requisicao, timeout=12) as resposta:
+        conteudo = resposta.read()
+
+    indice = json.loads(conteudo.decode("utf-8"))
+    versao_nova = str(indice.get("version") or indice.get("versao") or "").strip()
+    nome = str(indice.get("file") or indice.get("arquivo") or "").strip()
+    url = str(indice.get("url") or indice.get("download_url") or "").strip()
+
+    if not versao_nova or not nome or not url:
+        raise ValueError("Índice de atualização incompleto.")
+    if normalizar_versao(versao_nova) <= normalizar_versao(VERSAO_APP):
+        return None
+    if not url.startswith("https://"):
+        raise ValueError("URL de download inválida.")
+    if not nome.lower().endswith(".rar"):
+        raise ValueError("A atualização da pasta deve ser um arquivo RAR.")
+
+    return {
+        "versao": versao_nova,
+        "nome": nome,
+        "url": url,
+        "notas": str(indice.get("notes") or indice.get("notas") or "").strip(),
     }
 
 

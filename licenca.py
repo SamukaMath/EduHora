@@ -4,6 +4,8 @@ import json
 import os
 import platform
 import uuid
+import secrets
+from urllib.request import Request, urlopen
 from datetime import datetime, timezone
 
 try:
@@ -39,6 +41,25 @@ def obter_arquivo_licenca():
     return os.path.join(obter_diretorio_licenca(), "license.json")
 
 
+def obter_arquivo_ativacoes():
+    return os.path.join(obter_diretorio_licenca(), "activated_licenses.json")
+
+
+def obter_arquivo_revogacoes():
+    return os.path.join(obter_diretorio_licenca(), "revocations.json")
+
+
+def obter_license_id(payload, objeto=None):
+    license_id = str(payload.get("license_id") or "").strip()
+    if license_id:
+        return license_id
+
+    if objeto:
+        assinatura = str(objeto.get("signature") or "")
+        return hashlib.sha256(assinatura.encode("utf-8")).hexdigest()[:32].upper()
+    return ""
+
+
 def obter_machine_id():
     partes = [
         platform.system(),
@@ -68,6 +89,60 @@ def _normalizar_chave(chave):
         return None
 
 
+def _ler_revogacoes():
+    revogados = set()
+
+    url = os.environ.get("EDUHORA_REVOCATION_URL", "").strip()
+    if url.startswith("https://"):
+        try:
+            requisicao = Request(
+                url,
+                headers={"User-Agent": "EduHora-License-Validator"},
+            )
+            with urlopen(requisicao, timeout=8) as resposta:
+                remoto = json.loads(resposta.read().decode("utf-8"))
+            payload = remoto.get("payload", {})
+            assinatura = remoto.get("signature", "")
+            payload_bytes = json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            assinatura_bytes = base64.urlsafe_b64decode(
+                assinatura + "=" * (-len(assinatura) % 4)
+            )
+            chave_publica = serialization.load_pem_public_key(PUBLIC_KEY_PEM)
+            chave_publica.verify(assinatura_bytes, payload_bytes)
+            for license_id in payload.get("revoked", []):
+                revogados.add(str(license_id).strip().upper())
+        except Exception:
+            pass
+
+    arquivo_local = obter_arquivo_revogacoes()
+    if os.path.exists(arquivo_local):
+        try:
+            with open(arquivo_local, "r", encoding="utf-8") as handle:
+                local = json.load(handle)
+            payload = local.get("payload", {})
+            assinatura = local.get("signature", "")
+            payload_bytes = json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            assinatura_bytes = base64.urlsafe_b64decode(
+                assinatura + "=" * (-len(assinatura) % 4)
+            )
+            chave_publica = serialization.load_pem_public_key(PUBLIC_KEY_PEM)
+            chave_publica.verify(assinatura_bytes, payload_bytes)
+            for license_id in payload.get("revoked", []):
+                revogados.add(str(license_id).strip().upper())
+        except Exception:
+            pass
+
+    return revogados
+
+
 def validar_licenca(chave=None, machine_id=None):
     if Ed25519PublicKey is None:
         return False, "Dependência de assinatura não instalada."
@@ -90,6 +165,12 @@ def validar_licenca(chave=None, machine_id=None):
     assinatura_b64 = objeto.get("signature")
     if not isinstance(payload, dict) or not isinstance(assinatura_b64, str):
         return False, "Chave incompleta."
+
+    license_id = obter_license_id(payload, objeto)
+    if not license_id:
+        return False, "Identificador único da licença ausente."
+    if license_id.upper() in _ler_revogacoes():
+        return False, "Licença revogada pelo administrador."
 
     try:
         payload_bytes = json.dumps(
@@ -133,6 +214,7 @@ def validar_licenca(chave=None, machine_id=None):
         "machine_id": maquina or maquina_atual,
         "days_remaining": dias_restantes,
         "customer": payload.get("customer", ""),
+        "license_id": license_id,
     }
 
 
@@ -145,9 +227,31 @@ def ativar_licenca(chave):
     if not valido:
         return False, mensagem
 
+    payload = objeto.get("payload", {})
+    license_id = obter_license_id(payload, objeto).upper()
+    maquina_atual = obter_machine_id()
+
+    ativacoes = {}
+    arquivo_ativacoes = obter_arquivo_ativacoes()
+    if os.path.exists(arquivo_ativacoes):
+        try:
+            with open(arquivo_ativacoes, "r", encoding="utf-8") as handle:
+                ativacoes = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            ativacoes = {}
+
+    ativacao_existente = ativacoes.get(license_id)
+    if ativacao_existente:
+        if str(ativacao_existente).upper() != maquina_atual:
+            return False, "Esta licença já foi ativada em outro computador."
+    else:
+        ativacoes[license_id] = maquina_atual
+
     try:
         with open(obter_arquivo_licenca(), "w", encoding="utf-8") as handle:
             json.dump(objeto, handle, ensure_ascii=False, indent=2)
+        with open(arquivo_ativacoes, "w", encoding="utf-8") as handle:
+            json.dump(ativacoes, handle, ensure_ascii=False, indent=2)
         return True, mensagem
     except OSError as exc:
         return False, f"Não foi possível salvar a licença: {exc}"

@@ -7,9 +7,8 @@ import json
 import re
 import sys
 import webbrowser
-from urllib.parse import quote
-from licenca import ativar_licenca, obter_machine_id, validar_licenca
-from atualizador import VERSAO_APP, verificar_atualizacao, iniciar_atualizacao
+from atualizador import verificar_atualizacao
+from version import VERSAO_APP
 
 class AppHorariosPro:
     def __init__(self, root):
@@ -50,7 +49,6 @@ class AppHorariosPro:
         ]
 
         self.configurar_menu()
-        self.root.after(15000, self.verificar_atualizacoes_silenciosas)
 
         self.cabecalho = ttk.Frame(root, style="Header.TFrame", padding=(24, 16))
         self.cabecalho.pack(fill='x', padx=15, pady=(15, 0))
@@ -75,7 +73,6 @@ class AppHorariosPro:
         self.aba_gerar = ttk.Frame(self.notebook)
         self.aba_dash = ttk.Frame(self.notebook)
         self.aba_prof_individual = ttk.Frame(self.notebook)
-        self.aba_licenca = ttk.Frame(self.notebook)
 
         self.notebook.add(self.aba_prof, text="👩‍🏫 Professores")
         self.notebook.add(self.aba_disc, text="📚 Disciplinas")
@@ -84,7 +81,6 @@ class AppHorariosPro:
         self.notebook.add(self.aba_gerar, text="🚀 Gerar & Editar")
         self.notebook.add(self.aba_dash, text="📊 Dashboard")
         self.notebook.add(self.aba_prof_individual, text="🧑‍🏫 Horário Individual")
-        self.notebook.add(self.aba_licenca, text="🔑 Licença")
 
         self.construir_abas()
 
@@ -473,235 +469,6 @@ class AppHorariosPro:
         self.canvas_prof_ind_manha = configurar_canvas_individual(painel_ind_manha)
         self.canvas_prof_ind_tarde = configurar_canvas_individual(painel_ind_tarde)
 
-        # --- Aba Licença ---
-        licenca_canvas = tk.Canvas(
-            self.aba_licenca,
-            background="#ffffff",
-            highlightthickness=0,
-        )
-        licenca_scroll = ttk.Scrollbar(
-            self.aba_licenca,
-            orient="vertical",
-            command=licenca_canvas.yview,
-        )
-        licenca_canvas.configure(yscrollcommand=licenca_scroll.set)
-        licenca_canvas.pack(side="left", fill="both", expand=True)
-        licenca_scroll.pack(side="right", fill="y")
-
-        licenca_container = ttk.Frame(licenca_canvas)
-        licenca_window = licenca_canvas.create_window(
-            (0, 0),
-            window=licenca_container,
-            anchor="nw",
-        )
-
-        licenca_container.bind(
-            "<Configure>",
-            lambda event: licenca_canvas.configure(
-                scrollregion=licenca_canvas.bbox("all")
-            ),
-        )
-
-        licenca_container.columnconfigure(0, weight=1)
-
-        def ajustar_largura_licenca(event):
-            licenca_canvas.itemconfigure(
-                licenca_window,
-                width=event.width,
-            )
-
-        licenca_canvas.bind("<Configure>", ajustar_largura_licenca)
-
-        def rolar_licenca(event):
-            licenca_canvas.yview_scroll(
-                -1 if event.delta > 0 else 1,
-                "units",
-            )
-
-        licenca_canvas.bind("<MouseWheel>", rolar_licenca)
-
-        ttk.Label(
-            licenca_container,
-            text="Assinaturas EduHora",
-            font=("Segoe UI", 18, "bold"),
-            bootstyle="primary"
-        ).pack(pady=(0, 8))
-
-        self.lbl_status_licenca = ttk.Label(
-            licenca_container,
-            text="",
-            font=("Segoe UI", 10),
-            justify="center"
-        )
-        self.lbl_status_licenca.pack(pady=(0, 10))
-
-        cards_plano = ttk.Frame(licenca_container)
-        cards_plano.pack(fill="x", pady=(0, 12))
-        cards_plano.columnconfigure((0, 1, 2), weight=1)
-
-        def criar_card_plano(coluna, titulo, periodo, preco, destaque=False):
-            card = ttk.Labelframe(
-                cards_plano,
-                text=titulo,
-                bootstyle="primary" if destaque else "secondary",
-                padding=(12, 10),
-            )
-            card.grid(row=0, column=coluna, sticky="nsew", padx=6)
-
-            ttk.Label(
-                card,
-                text=periodo,
-                font=("Segoe UI", 10),
-                anchor="center",
-                justify="center",
-            ).pack(fill="x")
-            ttk.Label(
-                card,
-                text=f"R$ {preco}",
-                font=("Segoe UI", 20, "bold"),
-                bootstyle="primary" if destaque else "secondary",
-                anchor="center",
-            ).pack(fill="x", pady=(4, 8))
-
-            def solicitar():
-                assunto = f"Solicitação de assinatura EduHora - {titulo}"
-                corpo = (
-                    f"Olá, desejo contratar o plano {titulo} do EduHora.\n\n"
-                    f"Plano escolhido: {titulo}\n"
-                    f"Período: {periodo}\n"
-                    f"Valor: R$ {preco}\n"
-                    f"ID da máquina: {obter_machine_id()}\n\n"
-                    "Forma de pagamento: Pix\n"
-                    "Estou enviando o comprovante em anexo.\n\n"
-                    "Prazo de envio da licença: até 24 horas após a confirmação do pagamento."
-                )
-                destinatario = "prof.samuelapolinario@gmail.com"
-                url = (
-                    "https://mail.google.com/mail/?view=cm&fs=1"
-                    f"&to={destinatario}"
-                    f"&su={quote(assunto)}"
-                    f"&body={quote(corpo)}"
-                )
-                webbrowser.open(url)
-
-            ttk.Button(
-                card,
-                text="Solicitar Plano",
-                bootstyle="primary" if destaque else "secondary",
-                command=solicitar,
-            ).pack(fill="x")
-
-        criar_card_plano(0, "Trimestral", "3 meses", "39,90")
-        criar_card_plano(1, "Semestral", "6 meses", "79,90", destaque=True)
-        criar_card_plano(2, "Anual", "12 meses", "109,90")
-
-        instrucoes = ttk.Labelframe(
-            licenca_container,
-            text="Como assinar",
-            bootstyle="info",
-            padding=(12, 8),
-        )
-        instrucoes.pack(fill="x", pady=(0, 10))
-
-        ttk.Label(
-            instrucoes,
-            text=(
-                "1. Escolha o plano desejado.\n"
-                "2. Clique em Solicitar Plano para enviar o pedido por email.\n"
-                "3. Informe seu nome, WhatsApp e o ID da máquina no email.\n"
-                "4. Realize o Pix e envie o comprovante para o mesmo email.\n"
-                "5. Após a confirmação do pagamento, envie a licença em até 24 horas."
-            ),
-            justify="left",
-            font=("Segoe UI", 9),
-        ).pack(fill="x")
-
-        ttk.Label(
-            licenca_container,
-            text="⏱️ Prazo: até 24 horas após a confirmação do pagamento.",
-            font=("Segoe UI", 10, "bold"),
-            bootstyle="warning",
-            anchor="center",
-            justify="center",
-        ).pack(fill="x", pady=(0, 8))
-
-        pagamento = ttk.Frame(licenca_container)
-        pagamento.pack(fill="x", pady=(0, 10))
-        pagamento.columnconfigure(1, weight=1)
-
-        ttk.Label(
-            pagamento,
-            text="Chave Pix:",
-            font=("Segoe UI", 9, "bold"),
-        ).grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ent_pix = ttk.Entry(
-            pagamento,
-            state="readonly",
-        )
-        ent_pix.grid(row=0, column=1, sticky="ew")
-        ent_pix.configure(state="normal")
-        ent_pix.insert(0, "prof.samuelapolinario@gmail.com")
-        ent_pix.configure(state="readonly")
-
-        def copiar_pix():
-            self.root.clipboard_clear()
-            self.root.clipboard_append("prof.samuelapolinario@gmail.com")
-            messagebox.showinfo("Pix copiado", "Chave Pix copiada para a área de transferência.")
-
-        ttk.Button(
-            pagamento,
-            text="Copiar Pix",
-            bootstyle="secondary",
-            command=copiar_pix,
-        ).grid(row=0, column=2, padx=(8, 0))
-
-        ativacao = ttk.Labelframe(
-            licenca_container,
-            text="Ativar licença recebida",
-            bootstyle="success",
-            padding=(12, 8),
-        )
-        ativacao.pack(fill="both", expand=True)
-
-        ttk.Label(
-            ativacao,
-            text=f"ID desta máquina: {obter_machine_id()}",
-            font=("Segoe UI", 8),
-            bootstyle="secondary",
-        ).pack(anchor="w")
-
-        self.ent_licenca = tk.Text(
-            ativacao,
-            width=70,
-            height=10,
-            wrap="char",
-            relief="solid",
-            borderwidth=1,
-        )
-        self.ent_licenca.pack(fill="both", expand=True, pady=(6, 8))
-
-        def ativar_licenca_aba():
-            chave = self.ent_licenca.get("1.0", "end").strip()
-            ok, resultado = ativar_licenca(chave)
-            if not ok:
-                messagebox.showerror("Licença inválida", str(resultado))
-                return
-            messagebox.showinfo(
-                "Licença ativada",
-                f"Assinatura ativada até {resultado['expires_at']}."
-            )
-            self.ent_licenca.delete("1.0", "end")
-            self.atualizar_status_licenca()
-
-        ttk.Button(
-            licenca_container,
-            text="✅ Ativar Licença",
-            bootstyle="success",
-            command=ativar_licenca_aba
-        ).pack(pady=(0, 8))
-
-        self.atualizar_status_licenca()
-
     # ================= MÉTODOS BASE E ATUALIZAÇÕES =================
     # ================= MÉTODOS BASE E ATUALIZAÇÕES =================
     def configurar_menu(self):
@@ -716,89 +483,59 @@ class AppHorariosPro:
         
         sobre_menu = tk.Menu(menu_bar, tearoff=0)
         sobre_menu.add_command(label="Sobre o Sistema", command=self.abrir_janela_sobre)
-        sobre_menu.add_command(label="Licença / Assinatura...", command=self.abrir_janela_licenca)
         sobre_menu.add_command(label="Verificar Atualizações", command=self.verificar_atualizacoes_manual)
         menu_bar.add_cascade(label="Sobre", menu=sobre_menu)
         
         self.root.config(menu=menu_bar)
 
-    def atualizar_status_licenca(self):
-        if not hasattr(self, "lbl_status_licenca"):
-            return
-        valido, dados = validar_licenca()
-        if valido:
-            texto = (
-                f"Licença ativa — Plano: {dados['plan']} — "
-                f"válida até {dados['expires_at']} "
-                f"({dados['days_remaining']} dias restantes)"
-            )
-            bootstyle = "success"
-        else:
-            texto = f"Licença não ativa — {dados}"
-            bootstyle = "danger"
-        self.lbl_status_licenca.configure(text=texto, bootstyle=bootstyle)
-
-    def verificar_atualizacoes_silenciosas(self):
-        threading.Thread(
-            target=self._processar_verificacao_atualizacao,
-            kwargs={"manual": False},
-            daemon=True,
-        ).start()
-
     def verificar_atualizacoes_manual(self):
         threading.Thread(
             target=self._processar_verificacao_atualizacao,
-            kwargs={"manual": True},
             daemon=True,
         ).start()
 
-    def _processar_verificacao_atualizacao(self, manual=False):
+    def _processar_verificacao_atualizacao(self):
         try:
             atualizacao = verificar_atualizacao()
             if atualizacao is None:
-                if manual:
-                    self.root.after(
-                        0,
-                        lambda: messagebox.showinfo(
-                            "Atualizações",
-                            f"Você já está usando a versão mais recente ({VERSAO_APP}).",
-                        ),
-                    )
-                return
-
-            if not getattr(sys, "frozen", False):
-                if manual:
-                    self.root.after(
-                        0,
-                        lambda: messagebox.showinfo(
-                            "Atualização disponível",
-                            f"Nova versão: {atualizacao['versao']}\n"
-                            "A instalação automática está disponível apenas no executável.",
-                        ),
-                    )
-                return
-
-            ok, mensagem = iniciar_atualizacao(
-                atualizacao["url"],
-                atualizacao["nome"],
-            )
-            if manual or ok:
                 self.root.after(
                     0,
                     lambda: messagebox.showinfo(
-                        "Atualização",
-                        f"{mensagem}\nNova versão: {atualizacao['versao']}",
+                        "Atualizações",
+                        f"Você já está usando a versão mais recente ({VERSAO_APP}).",
                     ),
                 )
-        except Exception as exc:
-            if manual:
+                return
+
+            if atualizacao.get("requer_manual"):
+                versao_encontrada = atualizacao.get("versao")
+                mensagem_pasta = (
+                    f"Nova versão encontrada: {versao_encontrada}\n\n"
+                    if versao_encontrada
+                    else ""
+                )
+                pasta_drive = atualizacao["pasta"]
                 self.root.after(
                     0,
-                    lambda: messagebox.showwarning(
-                        "Atualização",
-                        f"Não foi possível verificar:\n{exc}",
+                    lambda: (
+                        webbrowser.open(pasta_drive),
+                        messagebox.showinfo(
+                            "Atualizações no Google Drive",
+                            f"{mensagem_pasta}"
+                            "Abra a pasta e baixe o arquivo RAR da versão indicada.\n"
+                            "Use WinRAR ou 7-Zip para substituir a instalação.",
+                        ),
                     ),
                 )
+                return
+        except Exception as exc:
+            self.root.after(
+                0,
+                lambda: messagebox.showwarning(
+                    "Atualização",
+                    f"Não foi possível verificar:\n{exc}",
+                ),
+            )
 
     def salvar_projeto(self):
         dados = {
@@ -856,78 +593,6 @@ class AppHorariosPro:
             self.tv_req.delete(*self.tv_req.get_children())
             self.btn_exportar.config(state="disabled")
             self.btn_exportar_pdf.config(state="disabled")
-            
-    def abrir_janela_licenca(self):
-        janela = ttk.Toplevel(self.root)
-        janela.title("Licença / Assinatura")
-        janela.geometry("620x430")
-        janela.resizable(False, False)
-        janela.transient(self.root)
-        janela.grab_set()
-
-        valido, dados = validar_licenca()
-        if valido:
-            status_texto = (
-                f"Licença ativa\nPlano: {dados['plan']}\n"
-                f"Validade: {dados['expires_at']} "
-                f"({dados['days_remaining']} dias restantes)"
-            )
-            bootstyle = "success"
-        else:
-            status_texto = f"Licença não ativa\n{dados}"
-            bootstyle = "danger"
-
-        ttk.Label(
-            janela,
-            text=status_texto,
-            bootstyle=bootstyle,
-            font=("Segoe UI", 10, "bold"),
-            justify="left"
-        ).pack(fill="x", padx=20, pady=(15, 10))
-
-        ttk.Label(
-            janela,
-            text=f"ID desta máquina: {obter_machine_id()}",
-            font=("Segoe UI", 9),
-            bootstyle="secondary"
-        ).pack(anchor="w", padx=20)
-
-        ttk.Label(
-            janela,
-            text="Cole abaixo a chave recebida:",
-            font=("Segoe UI", 9, "bold")
-        ).pack(anchor="w", padx=20, pady=(15, 5))
-
-        chave_texto = tk.Text(janela, width=70, height=9, wrap="char")
-        chave_texto.pack(fill="both", expand=True, padx=20)
-
-        def ativar():
-            chave = chave_texto.get("1.0", "end").strip()
-            ok, mensagem = ativar_licenca(chave)
-            if not ok:
-                messagebox.showerror("Licença inválida", str(mensagem), parent=janela)
-                return
-            messagebox.showinfo(
-                "Licença ativada",
-                f"Assinatura ativada até {mensagem['expires_at']}.",
-                parent=janela
-            )
-            janela.destroy()
-
-        botoes = ttk.Frame(janela)
-        botoes.pack(pady=12)
-        ttk.Button(
-            botoes,
-            text="✅ Ativar Licença",
-            bootstyle="success",
-            command=ativar
-        ).pack(side="left", padx=5)
-        ttk.Button(
-            botoes,
-            text="Fechar",
-            bootstyle="secondary",
-            command=janela.destroy
-        ).pack(side="left", padx=5)
             
     def abrir_janela_sobre(self):
         # Cria a janela pop-up
@@ -1521,16 +1186,6 @@ class AppHorariosPro:
         return True
     
     def iniciar_geracao(self):
-        valido, dados = validar_licenca()
-        if not valido:
-            messagebox.showwarning(
-                "Licença necessária",
-                "Ative uma licença na aba 'Licença' para gerar a grade horária."
-            )
-            self.notebook.select(self.aba_licenca)
-            self.atualizar_status_licenca()
-            return
-
         if not self.requerimentos: return messagebox.showwarning("Aviso", "A grade está vazia!")
         if not self.validar_dados_antes_de_gerar(): return 
         self.btn_gerar.config(state="disabled"); self.btn_exportar.config(state="disabled"); self.btn_exportar_pdf.config(state="disabled")

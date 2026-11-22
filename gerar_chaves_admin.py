@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import sys
+import secrets
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -80,6 +81,7 @@ def gerar_license(private_key_path, plano, dias, cliente, machine_id):
 
     payload = {
         "version": 1,
+        "license_id": secrets.token_hex(16).upper(),
         "plan": plano.lower(),
         "issued_at": inicio.strftime("%Y-%m-%d"),
         "expires_at": (inicio + timedelta(days=quantidade_dias)).strftime("%Y-%m-%d"),
@@ -103,6 +105,33 @@ def gerar_license(private_key_path, plano, dias, cliente, machine_id):
         json.dumps(objeto, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).rstrip(b"=").decode("ascii")
     return compacta, objeto
+
+
+def gerar_lista_revogacao(private_key_path, license_ids, output_path=None):
+    with open(private_key_path, "rb") as handle:
+        private_key = serialization.load_pem_private_key(handle.read(), password=None)
+
+    payload = {
+        "version": 1,
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "revoked": sorted({str(value).strip().upper() for value in license_ids if str(value).strip()}),
+    }
+    payload_bytes = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    objeto = {
+        "payload": payload,
+        "signature": base64.urlsafe_b64encode(
+            private_key.sign(payload_bytes)
+        ).rstrip(b"=").decode("ascii"),
+    }
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(objeto, handle, ensure_ascii=False, indent=2)
+    return objeto
 
 
 class AdminLicencasApp:
@@ -189,6 +218,16 @@ class AdminLicencasApp:
             command=self.gerar_novo_par,
         ).grid(row=1, column=0, columnspan=3, pady=(10, 4))
 
+        ttk.Label(chaves, text="License ID:").grid(row=2, column=0, sticky="w", pady=5)
+        self.ent_license_id = ttk.Entry(chaves)
+        self.ent_license_id.grid(row=2, column=1, sticky="ew", padx=8)
+        ttk.Button(
+            chaves,
+            text="Revogar",
+            bootstyle="danger",
+            command=self.revogar_license,
+        ).grid(row=2, column=2)
+
         botoes = ttk.Frame(root)
         botoes.pack(pady=8)
         ttk.Button(
@@ -255,6 +294,43 @@ class AdminLicencasApp:
         except Exception as exc:
             messagebox.showerror("Erro", f"Não foi possível gerar o par:\n{exc}")
 
+    def revogar_license(self):
+        private_path = self.ent_private_key.get().strip()
+        license_id = self.ent_license_id.get().strip().upper()
+        if not private_path or not os.path.isfile(private_path):
+            messagebox.showwarning("Chave privada", "Selecione uma chave privada válida.")
+            return
+        if not license_id:
+            messagebox.showwarning("License ID", "Informe o identificador da licença.")
+            return
+        if not messagebox.askyesno(
+            "Revogar licença",
+            f"Revogar permanentemente a licença {license_id}?",
+        ):
+            return
+
+        caminho = filedialog.asksaveasfilename(
+            title="Salvar lista de revogações",
+            defaultextension=".json",
+            filetypes=[("Revogação JSON", "*.json")],
+            initialfile="revocations.json",
+        )
+        if not caminho:
+            return
+        try:
+            objeto = gerar_lista_revogacao(
+                private_path,
+                [license_id],
+                caminho,
+            )
+            messagebox.showinfo(
+                "Licença revogada",
+                f"{license_id} foi incluída na lista assinada.\n\n"
+                "Publique revocations.json no endereço configurado.",
+            )
+        except Exception as exc:
+            messagebox.showerror("Erro", f"Não foi possível revogar:\n{exc}")
+
     def gerar_license(self):
         private_path = self.ent_private_key.get().strip()
         if not private_path or not os.path.isfile(private_path):
@@ -315,6 +391,16 @@ class AdminLicencasApp:
 
 
 def executar_admin_cli(args):
+    if args.revoke:
+        private_path = args.private_key or obter_chaves_padrao()[0]
+        objeto = gerar_lista_revogacao(
+            private_path,
+            args.revoke,
+            args.revocation_output or "",
+        )
+        print(json.dumps(objeto, ensure_ascii=False, indent=2))
+        return
+
     if args.generate_keys:
         private_path = args.private_key or os.path.join(
             obter_diretorio_admin(),
@@ -359,6 +445,8 @@ def main():
     parser.add_argument("--customer", default="")
     parser.add_argument("--machine-id", default="")
     parser.add_argument("--output", default="")
+    parser.add_argument("--revoke", nargs="+", default=[], metavar="LICENSE_ID")
+    parser.add_argument("--revocation-output", default="")
     parser.add_argument("--cli", action="store_true")
     args = parser.parse_args()
 
