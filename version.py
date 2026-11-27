@@ -1,1 +1,1 @@
-VERSAO_APP = "1.1.5"
+VERSAO_APP = "1.1.8"

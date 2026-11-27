@@ -71,6 +71,7 @@ class AppHorariosPro:
         self.aba_turmas = ttk.Frame(self.notebook)
         self.aba_distrib = ttk.Frame(self.notebook)
         self.aba_gerar = ttk.Frame(self.notebook)
+        self.aba_grade = ttk.Frame(self.notebook)
         self.aba_dash = ttk.Frame(self.notebook)
         self.aba_prof_individual = ttk.Frame(self.notebook)
 
@@ -78,7 +79,8 @@ class AppHorariosPro:
         self.notebook.add(self.aba_disc, text="📚 Disciplinas")
         self.notebook.add(self.aba_turmas, text="🎓 Turmas")
         self.notebook.add(self.aba_distrib, text="⚙️ Grade (Vínculos)")
-        self.notebook.add(self.aba_gerar, text="🚀 Gerar & Editar")
+        self.notebook.add(self.aba_gerar, text="🚀 Gerar")
+        self.notebook.add(self.aba_grade, text="📅 Visualizar Grade")
         self.notebook.add(self.aba_dash, text="📊 Dashboard")
         self.notebook.add(self.aba_prof_individual, text="🧑‍🏫 Horário Individual")
 
@@ -257,12 +259,6 @@ class AppHorariosPro:
         )
         self.chk_triplas.pack(side='left', padx=10)
         
-        self.btn_exportar = ttk.Button(f_btn, text="📥 EXCEL", bootstyle="warning", state="disabled", command=self.salvar_excel)
-        self.btn_exportar.pack(side='left', padx=10)
-
-        self.btn_exportar_pdf = ttk.Button(f_btn, text="📄 PDF", bootstyle="danger", state="disabled", command=self.salvar_pdf)
-        self.btn_exportar_pdf.pack(side='left', padx=10)
-
         self.lbl_status = ttk.Label(self.aba_gerar, text="Status: Aguardando...", font=("Arial", 10, "italic"))
         self.lbl_status.pack(pady=5)
         
@@ -270,12 +266,100 @@ class AppHorariosPro:
         self.progress_bar = ttk.Progressbar(self.aba_gerar, variable=self.progresso_var, maximum=100, mode="determinate", bootstyle="success-striped")
         self.progress_bar.pack(fill="x", padx=40, pady=10)
 
-        ttk.Label(self.aba_gerar, text="💡 Clique duplo em uma aula para editar manualmente.", bootstyle="inverse-warning", font=("Arial", 9)).pack(pady=5)
+        ttk.Label(
+            self.aba_gerar,
+            text="💡 A grade gerada será exibida na aba “Visualizar Grade”.",
+            bootstyle="inverse-warning",
+            font=("Segoe UI", 9),
+        ).pack(pady=12)
 
-        self.legenda_professores = ttk.Frame(self.aba_gerar)
+        # --- Aba Visualizar Grade ---
+        ttk.Label(
+            self.aba_grade,
+            text="Visualização da Grade Escolar",
+            font=("Segoe UI", 16, "bold"),
+            bootstyle="primary",
+        ).pack(pady=(12, 6))
+
+        ttk.Label(
+            self.aba_grade,
+            text="💡 Clique duplo em uma aula para editar manualmente.",
+            bootstyle="inverse-warning",
+            font=("Segoe UI", 9),
+        ).pack(pady=(0, 6))
+
+        self.lbl_status_grade = ttk.Label(
+            self.aba_grade,
+            text="Status: Aguardando geração...",
+            font=("Segoe UI", 9, "italic"),
+            bootstyle="secondary",
+        )
+        self.lbl_status_grade.pack(pady=(0, 4))
+
+        barra_zoom = ttk.Frame(self.aba_grade)
+        barra_zoom.pack(fill="x", padx=20, pady=(0, 5))
+
+        ttk.Label(
+            barra_zoom,
+            text="Zoom da grade:",
+            font=("Segoe UI", 9, "bold"),
+        ).pack(side="left", padx=(0, 8))
+
+        self.zoom_grade = 0.60
+        self.lbl_zoom_grade = ttk.Label(
+            barra_zoom,
+            text="60%",
+            width=8,
+            anchor="center",
+            font=("Segoe UI", 9, "bold"),
+        )
+        self.lbl_zoom_grade.pack(side="left", padx=5)
+
+        ttk.Button(
+            barra_zoom,
+            text="−",
+            width=3,
+            bootstyle="secondary",
+            command=lambda: self.alterar_zoom_grade(-0.10),
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            barra_zoom,
+            text="100%",
+            width=6,
+            bootstyle="secondary",
+            command=lambda: self.definir_zoom_grade(1.0),
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            barra_zoom,
+            text="+",
+            width=3,
+            bootstyle="secondary",
+            command=lambda: self.alterar_zoom_grade(0.10),
+        ).pack(side="left", padx=2)
+
+        acoes_exportacao = ttk.Frame(barra_zoom)
+        acoes_exportacao.pack(side="right")
+        self.btn_exportar = ttk.Button(
+            acoes_exportacao,
+            text="📥 Excel",
+            bootstyle="warning",
+            state="disabled",
+            command=self.salvar_excel
+        )
+        self.btn_exportar.pack(side="left", padx=4)
+        self.btn_exportar_pdf = ttk.Button(
+            acoes_exportacao,
+            text="📄 PDF",
+            bootstyle="danger",
+            state="disabled",
+            command=self.salvar_pdf
+        )
+        self.btn_exportar_pdf.pack(side="left", padx=4)
+
+        self.legenda_professores = ttk.Frame(self.aba_grade)
         self.legenda_professores.pack(fill="x", padx=20, pady=(0, 5))
 
-        self.painel_grades = ttk.Panedwindow(self.aba_gerar, orient="vertical")
+        self.painel_grades = ttk.Panedwindow(self.aba_grade, orient="vertical")
         self.painel_grades.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
         painel_manha = ttk.Labelframe(self.painel_grades, text="☀️  Grade - Turno da Manhã", bootstyle="primary", padding=5)
@@ -285,6 +369,7 @@ class AppHorariosPro:
             "<Double-1>",
             lambda event: self.editar_aula_visual(event, self.tv_previa_manha, self.canvas_previa_manha)
         )
+        self.canvas_previa_manha.bind("<Control-MouseWheel>", self.zoom_mouse_grade)
 
         painel_tarde = ttk.Labelframe(self.painel_grades, text="🌆  Grade - Turno da Tarde", bootstyle="warning", padding=5)
         self.tv_previa_tarde = ttk.Treeview(painel_tarde, show='headings', bootstyle="warning")
@@ -293,29 +378,82 @@ class AppHorariosPro:
             "<Double-1>",
             lambda event: self.editar_aula_visual(event, self.tv_previa_tarde, self.canvas_previa_tarde)
         )
+        self.canvas_previa_tarde.bind("<Control-MouseWheel>", self.zoom_mouse_grade)
 
         self.painel_grades.add(painel_manha, weight=1)
         self.painel_grades.add(painel_tarde, weight=1)
 
         # --- Aba Dashboard ---
-        ttk.Label(
-            self.aba_dash,
-            text="Dashboard da Distribuição",
-            font=("Segoe UI", 16, "bold"),
-            bootstyle="primary"
-        ).pack(pady=(12, 8))
+        dashboard_area = ttk.Frame(self.aba_dash)
+        dashboard_area.pack(fill="both", expand=True)
 
-        cards = ttk.Frame(self.aba_dash)
-        cards.pack(fill="x", padx=20, pady=(0, 10))
+        self.canvas_dashboard = tk.Canvas(
+            dashboard_area,
+            background="#f3f6fa",
+            highlightthickness=0
+        )
+        barra_dashboard = ttk.Scrollbar(
+            dashboard_area,
+            orient="vertical",
+            command=self.canvas_dashboard.yview
+        )
+        self.canvas_dashboard.configure(yscrollcommand=barra_dashboard.set)
+        self.canvas_dashboard.pack(side="left", fill="both", expand=True)
+        barra_dashboard.pack(side="right", fill="y")
+
+        conteudo_dashboard = ttk.Frame(self.canvas_dashboard, padding=(14, 8, 14, 16))
+        self._janela_dashboard = self.canvas_dashboard.create_window(
+            (0, 0),
+            window=conteudo_dashboard,
+            anchor="nw"
+        )
+        conteudo_dashboard.bind(
+            "<Configure>",
+            lambda event: self.canvas_dashboard.configure(
+                scrollregion=self.canvas_dashboard.bbox("all")
+            )
+        )
+        self.canvas_dashboard.bind(
+            "<Configure>",
+            lambda event: self.canvas_dashboard.itemconfigure(
+                self._janela_dashboard,
+                width=event.width
+            )
+        )
+        self.root.bind_all("<MouseWheel>", self.rolar_dashboard_com_mouse, add="+")
+
+        ttk.Label(
+            conteudo_dashboard,
+            text="Dashboard da Distribuição",
+            font=("Segoe UI", 18, "bold"),
+            bootstyle="primary"
+        ).pack(anchor="w", padx=6, pady=(8, 2))
+        ttk.Label(
+            conteudo_dashboard,
+            text="Resumo da carga horária e da qualidade da grade por professor.",
+            font=("Segoe UI", 9),
+            bootstyle="secondary"
+        ).pack(anchor="w", padx=7, pady=(0, 12))
+
+        cards = ttk.Frame(conteudo_dashboard)
+        cards.pack(fill="x", padx=4, pady=(0, 12))
         cards.columnconfigure((0, 1, 2, 3), weight=1)
 
-        self.dash_card_professores = self.criar_card_dashboard(cards, "PROFESSORES", "0", 0)
-        self.dash_card_aulas = self.criar_card_dashboard(cards, "AULAS NA GRADE", "0", 1)
-        self.dash_card_perfeitos = self.criar_card_dashboard(cards, "SEM PENALIDADES", "0", 2)
-        self.dash_card_penalidades = self.criar_card_dashboard(cards, "AULAS CEDIDAS", "0", 3)
+        self.dash_card_professores = self.criar_card_dashboard(
+            cards, "PROFESSORES", "0", 0, "primary"
+        )
+        self.dash_card_aulas = self.criar_card_dashboard(
+            cards, "AULAS NA GRADE", "0", 1, "info"
+        )
+        self.dash_card_perfeitos = self.criar_card_dashboard(
+            cards, "SEM PENALIDADES", "0", 2, "success"
+        )
+        self.dash_card_penalidades = self.criar_card_dashboard(
+            cards, "AULAS CEDIDAS", "0", 3, "warning"
+        )
 
-        area_graficos = ttk.Panedwindow(self.aba_dash, orient="horizontal")
-        area_graficos.pack(fill="x", padx=20, pady=(0, 10))
+        area_graficos = ttk.Panedwindow(conteudo_dashboard, orient="horizontal")
+        area_graficos.pack(fill="x", padx=4, pady=(0, 12))
 
         painel_barras = ttk.Labelframe(
             area_graficos,
@@ -368,19 +506,21 @@ class AppHorariosPro:
         area_graficos.add(painel_qualidade, weight=2)
 
         ttk.Label(
-            self.aba_dash,
+            conteudo_dashboard,
             text="Detalhamento por professor",
-            font=("Segoe UI", 11, "bold")
-        ).pack(anchor="w", padx=20, pady=(4, 4))
+            font=("Segoe UI", 12, "bold"),
+            bootstyle="primary"
+        ).pack(anchor="w", padx=6, pady=(3, 6))
 
-        tabela_frame = ttk.Frame(self.aba_dash)
-        tabela_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        tabela_frame = ttk.Frame(conteudo_dashboard)
+        tabela_frame.pack(fill="x", padx=4, pady=(0, 4))
 
         self.tv_dash = ttk.Treeview(
             tabela_frame,
             columns=("Prof", "Total", "Penalidades", "Qualidade", "Status"),
             show="headings",
-            bootstyle="info"
+            bootstyle="primary",
+            height=1
         )
         self.tv_dash.heading("Prof", text="Professor")
         self.tv_dash.heading("Total", text="Aulas Semanais")
@@ -433,6 +573,44 @@ class AppHorariosPro:
         )
         self.lbl_carga_individual.pack(side="left", padx=20)
 
+        self.zoom_grade_individual = 0.60
+        controles_zoom_individual = ttk.Frame(cabecalho_individual)
+        controles_zoom_individual.pack(side="right")
+        ttk.Label(
+            controles_zoom_individual,
+            text="Zoom:",
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(0, 5))
+        self.lbl_zoom_grade_individual = ttk.Label(
+            controles_zoom_individual,
+            text="60%",
+            width=6,
+            anchor="center",
+            font=("Segoe UI", 9, "bold")
+        )
+        self.lbl_zoom_grade_individual.pack(side="left", padx=3)
+        ttk.Button(
+            controles_zoom_individual,
+            text="−",
+            width=3,
+            bootstyle="secondary",
+            command=lambda: self.alterar_zoom_grade_individual(-0.10)
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            controles_zoom_individual,
+            text="100%",
+            width=6,
+            bootstyle="secondary",
+            command=lambda: self.definir_zoom_grade_individual(1.0)
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            controles_zoom_individual,
+            text="+",
+            width=3,
+            bootstyle="secondary",
+            command=lambda: self.alterar_zoom_grade_individual(0.10)
+        ).pack(side="left", padx=2)
+
         frame_individual = ttk.Frame(self.aba_prof_individual)
         frame_individual.pack(fill="both", expand=True, padx=20, pady=(0, 15))
 
@@ -459,6 +637,7 @@ class AppHorariosPro:
             barra_v = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
             barra_h = ttk.Scrollbar(parent, orient="horizontal", command=canvas.xview)
             canvas.configure(yscrollcommand=barra_v.set, xscrollcommand=barra_h.set)
+            canvas.bind("<Control-MouseWheel>", self.zoom_mouse_grade_individual)
             parent.columnconfigure(0, weight=1)
             parent.rowconfigure(0, weight=1)
             canvas.grid(row=0, column=0, sticky="nsew")
@@ -580,6 +759,7 @@ class AppHorariosPro:
             self.canvas_previa_manha.delete("all")
             self.canvas_previa_tarde.delete("all")
             self.tv_dash.delete(*self.tv_dash.get_children())
+            self.tv_dash.configure(height=1)
             self._dados_dashboard = []
             self.atualizar_card_dashboard(self.dash_card_professores, 0)
             self.atualizar_card_dashboard(self.dash_card_aulas, 0)
@@ -1090,8 +1270,9 @@ class AppHorariosPro:
     def editar_aula_visual(self, event, tv_alvo, canvas):
         x = canvas.canvasx(event.x)
         y = canvas.canvasy(event.y)
-        cabecalho_altura = 30
-        altura_linha = 38
+        zoom = getattr(self, "zoom_grade", 1.0)
+        cabecalho_altura = int(30 * zoom)
+        altura_linha = int(38 * zoom)
         larguras = self.larguras_grade(tv_alvo)
 
         if y < cabecalho_altura:
@@ -1196,6 +1377,7 @@ class AppHorariosPro:
         self.canvas_previa_manha.delete("all")
         self.canvas_previa_tarde.delete("all")
         self._usar_triplas = bool(self.var_agrupar_triplas.get()) if hasattr(self, "var_agrupar_triplas") else False
+        self.notebook.select(self.aba_grade)
         
         self.progresso_var.set(0)
         threading.Thread(target=self.processar_algoritmo).start()
@@ -1210,6 +1392,8 @@ class AppHorariosPro:
             def aplicar_status():
                 self.progresso_var.set(pct)
                 self.lbl_status.config(text=texto, bootstyle="info")
+                if hasattr(self, "lbl_status_grade"):
+                    self.lbl_status_grade.config(text=texto, bootstyle="info")
 
             self.root.after(0, aplicar_status)
 
@@ -1333,451 +1517,7 @@ class AppHorariosPro:
         finally:
             if hasattr(self, "btn_gerar"):
                 self.btn_gerar.config(state="normal")               
-                   
-    # Algoritmo  genetico - processamento mais rapido para regras menos rigidas
-    # def processar_algoritmo(self):
-    #     import random
-    #     import math
-    #     from tkinter import messagebox
-
-    #     try:
-    #         self.progresso_var.set(5)
-    #         self.lbl_status.config(text="Status: A inicializar população do Algoritmo Genético...", bootstyle="info")
-    #         if hasattr(self, "root"):
-    #             self.root.update_idletasks()
-
-    #         # ============================================================
-    #         # 1. PREPARAÇÃO DOS DADOS E BLOQUEIOS
-    #         # ============================================================
-    #         dias = len(self.dias_semana)
-    #         aulas_manha = int(self.spin_manha.get())
-    #         aulas_tarde = int(self.spin_tarde.get())
-    #         total_aulas_dia = aulas_manha + aulas_tarde
-
-    #         horarios_m = getattr(self, "horarios_m_custom", [f"{i+1}ª Aula (Manhã)" for i in range(aulas_manha)])
-    #         horarios_t = getattr(self, "horarios_t_custom", [f"{i+1}ª Aula (Tarde)" for i in range(aulas_tarde)])
-
-    #         def eh_manha(nome_turma):
-    #             t_str = str(self.turmas.get(nome_turma, "Manhã")).strip().lower()
-    #             return t_str.startswith("m")
-
-    #         mapa_nomes_dias = {str(nome).strip().lower(): idx for idx, nome in enumerate(self.dias_semana)}
-    #         def normalizar_dia(d_val):
-    #             if isinstance(d_val, int):
-    #                 return d_val
-    #             s = str(d_val).strip().lower()
-    #             if s.isdigit():
-    #                 return int(s)
-    #             if s in mapa_nomes_dias:
-    #                 return mapa_nomes_dias[s]
-    #             for nome_cad, idx in mapa_nomes_dias.items():
-    #                 if s in nome_cad or nome_cad in s:
-    #                     return idx
-    #             return -1
-
-    #         # Separa indisponibilidade de DIA INTEIRO (peso máximo) e de AULA AVULSA (peso alto)
-    #         folga_dia_prof = set()      # (prof, d, global_a) -> Professor não vai à escola neste dia/turno
-    #         bloq_aula_prof = set()      # (prof, d, global_a) -> Restrição de horário pontual (ex: 5ª aula)
-
-    #         for prof, dados in self.professores.items():
-    #             for d_raw in dados.get("manha", []):
-    #                 d_idx = normalizar_dia(d_raw)
-    #                 if 0 <= d_idx < dias:
-    #                     for a in range(aulas_manha):
-    #                         folga_dia_prof.add((prof, d_idx, a))
-
-    #             for d_raw in dados.get("tarde", []):
-    #                 d_idx = normalizar_dia(d_raw)
-    #                 if 0 <= d_idx < dias:
-    #                     for a in range(aulas_manha, total_aulas_dia):
-    #                         folga_dia_prof.add((prof, d_idx, a))
-
-    #             for bloq in dados.get("bloqueios", []):
-    #                 d_idx = normalizar_dia(bloq.get("dia", -1))
-    #                 if not (0 <= d_idx < dias):
-    #                     continue
-    #                 a_idx = int(bloq.get("aula", -1))
-    #                 turno = str(bloq.get("turno", "")).strip().upper()
-    #                 if turno.startswith("M") and 0 <= a_idx < aulas_manha:
-    #                     bloq_aula_prof.add((prof, d_idx, a_idx))
-    #                 elif turno.startswith("T") and 0 <= a_idx < aulas_tarde:
-    #                     bloq_aula_prof.add((prof, d_idx, aulas_manha + a_idx))
-
-    #         # ============================================================
-    #         # 2. CODIFICAÇÃO DO DNA (CROMOSSOMO SEM HORÁRIOS VAGOS)
-    #         # ============================================================
-    #         # Para cada turma, criamos uma lista exata de slots [(d, a), ...] e uma lista de aulas [r_idx, ...]
-    #         # Se a turma tem 25 aulas para 25 horários, NUNCA existirá slot vazio!
-    #         slots_por_turma = {}
-    #         genes_base_turma = {}
-
-    #         for turma in self.turmas:
-    #             faixas = list(range(aulas_manha)) if eh_manha(turma) else list(range(aulas_manha, total_aulas_dia))
-    #             slots_t = [(d, a) for d in range(dias) for a in faixas]
-    #             slots_por_turma[turma] = slots_t
-
-    #             genes = []
-    #             for r_idx, req in enumerate(self.requerimentos):
-    #                 if req["turma"] == turma:
-    #                     genes.extend([r_idx] * int(req["aulas"]))
-
-    #             # Caso alguma turma tenha menos aulas cadastradas que slots físicos, preenche com None
-    #             while len(genes) < len(slots_t):
-    #                 genes.append(None)
-
-    #             genes_base_turma[turma] = genes[:len(slots_t)]
-
-    #         # ============================================================
-    #         # 3. FUNÇÃO DE FITNESS (AVALIAÇÃO DE PENALIDADES DO INDIVÍDUO)
-    #         # ============================================================
-    #         # Pesos evolutivos:
-    #         P_CHOQUE_PROF = 50_000   # Dois lugares ao mesmo tempo (Inaceitável)
-    #         P_FOLGA_DIA   = 80_000   # Colocar professor no seu dia de folga (Inaceitável)
-    #         P_BLOQ_AULA   =  8_000   # Horário avulso bloqueado (Evita ao máximo, só usa se faltar prof na escola)
-    #         P_EXCESSO_DIA =    400   # Mais de 3 aulas da mesma disciplina no mesmo dia
-
-    #         def criar_individuo_inteligente():
-    #             """Cria um indivíduo tentando já colocar cada professor em dias onde não tem folga."""
-    #             ind = {}
-    #             ocup_temp = set()  # (prof, d, a)
-    #             # Ordena turmas aleatoriamente para diversidade genética
-    #             turmas_emb = list(self.turmas.keys())
-    #             random.shuffle(turmas_emb)
-
-    #             for turma in turmas_emb:
-    #                 slots_t = slots_por_turma[turma]
-    #                 aulas_t = genes_base_turma[turma][:]
-    #                 random.shuffle(aulas_t)
-    #                 aloc_turma = [None] * len(slots_t)
-    #                 usados = [False] * len(slots_t)
-
-    #                 # Aloca primeiro as aulas de professores com mais restrições
-    #                 aulas_t.sort(
-    #                     key=lambda r: (
-    #                         sum(1 for (p, _, _) in folga_dia_prof if p == self.requerimentos[r]["professor"])
-    #                         if r is not None else -1
-    #                     ),
-    #                     reverse=True
-    #                 )
-
-    #                 for r_idx in aulas_t:
-    #                     if r_idx is None:
-    #                         continue
-    #                     prof = self.requerimentos[r_idx]["professor"]
-    #                     melhor_s = None
-    #                     melhor_custo = 999_999_999
-
-    #                     indices_s = [i for i in range(len(slots_t)) if not usados[i]]
-    #                     random.shuffle(indices_s)
-
-    #                     for i_s in indices_s:
-    #                         d, a = slots_t[i_s]
-    #                         custo = 0
-    #                         if (prof, d, a) in folga_dia_prof:
-    #                             custo += P_FOLGA_DIA
-    #                         if (prof, d, a) in ocup_temp:
-    #                             custo += P_CHOQUE_PROF
-    #                         if (prof, d, a) in bloq_aula_prof:
-    #                             custo += P_BLOQ_AULA
-    #                         if custo == 0:
-    #                             melhor_s = i_s
-    #                             break
-    #                         if custo < melhor_custo:
-    #                             melhor_custo = custo
-    #                             melhor_s = i_s
-
-    #                     aloc_turma[melhor_s] = r_idx
-    #                     usados[melhor_s] = True
-    #                     d_escolhido, a_escolhido = slots_t[melhor_s]
-    #                     ocup_temp.add((prof, d_escolhido, a_escolhido))
-
-    #                 ind[turma] = aloc_turma
-    #             return ind
-
-    #         def avaliar_individuo(ind):
-    #             """Retorna (penalidade_total, lista_de_conflitos) do indivíduo."""
-    #             penalidade = 0
-    #             conflitos = []  # Guarda (turma, idx_slot) que possuem problemas graves
-    #             uso_prof_slot = {}  # (prof, d, a) -> (turma, idx_slot)
-
-    #             for turma, aloc_t in ind.items():
-    #                 slots_t = slots_por_turma[turma]
-    #                 cont_disc_dia = {}
-
-    #                 for idx_s, r_idx in enumerate(aloc_t):
-    #                     if r_idx is None:
-    #                         continue
-    #                     d, a = slots_t[idx_s]
-    #                     req = self.requerimentos[r_idx]
-    #                     prof = req["professor"]
-    #                     disc = req["disciplina"]
-
-    #                     # 1. Dia de folga do professor
-    #                     if (prof, d, a) in folga_dia_prof:
-    #                         penalidade += P_FOLGA_DIA
-    #                         conflitos.append((turma, idx_s))
-
-    #                     # 2. Bloqueio de aula avulsa
-    #                     elif (prof, d, a) in bloq_aula_prof:
-    #                         penalidade += P_BLOQ_AULA
-    #                         conflitos.append((turma, idx_s))
-
-    #                     # 3. Choque de professor em duas turmas ao mesmo tempo
-    #                     chave_p = (prof, d, a)
-    #                     if chave_p in uso_prof_slot:
-    #                         penalidade += P_CHOQUE_PROF
-    #                         conflitos.append((turma, idx_s))
-    #                         conflitos.append(uso_prof_slot[chave_p])
-    #                     else:
-    #                         uso_prof_slot[chave_p] = (turma, idx_s)
-
-    #                     # 4. Excesso da mesma matéria no mesmo dia (> 3 aulas)
-    #                     chave_dd = (d, disc)
-    #                     cont_disc_dia[chave_dd] = cont_disc_dia.get(chave_dd, 0) + 1
-    #                     if cont_disc_dia[chave_dd] > 3:
-    #                         penalidade += P_EXCESSO_DIA
-    #                         conflitos.append((turma, idx_s))
-
-    #             return penalidade, conflitos
-
-    #         # ============================================================
-    #         # 4. OPERADORES GENÉTICOS (CROSSOVER + MUTAÇÃO MEMÉTICA GUIADA)
-    #         # ============================================================
-    #         def cruzar(pai1, pai2):
-    #             """Crossover Uniforme por Turma: herda a grade inteira de cada turma do Pai 1 ou Pai 2."""
-    #             filho = {}
-    #             for turma in self.turmas:
-    #                 filho[turma] = pai1[turma][:] if random.random() < 0.5 else pai2[turma][:]
-    #             return filho
-
-    #         def mutar_e_reparar(ind, conflitos):
-    #             """
-    #             Mutação Memética Inteligente:
-    #             Escolhe uma aula em conflito e testa trocá-la (Swap) com outros horários da mesma turma,
-    #             aceitando a troca que reduz imediatamente o choque!
-    #             """
-    #             if not conflitos:
-    #                 return ind
-
-    #             # Mapa rápido de onde cada professor está ocupado neste indivíduo
-    #             ocup_prof = {}
-    #             for t, aloc_t in ind.items():
-    #                 for i_s, r in enumerate(aloc_t):
-    #                     if r is not None:
-    #                         p = self.requerimentos[r]["professor"]
-    #                         d, a = slots_por_turma[t][i_s]
-    #                         ocup_prof[(p, d, a)] = ocup_prof.get((p, d, a), 0) + 1
-
-    #             def custo_local_slot(turma, r_idx, d, a, ignorar_proprio=False):
-    #                 if r_idx is None:
-    #                     return 0
-    #                 p = self.requerimentos[r_idx]["professor"]
-    #                 c = 0
-    #                 if (p, d, a) in folga_dia_prof:
-    #                     c += P_FOLGA_DIA
-    #                 elif (p, d, a) in bloq_aula_prof:
-    #                     c += P_BLOQ_AULA
-    #                 qtd_uso = ocup_prof.get((p, d, a), 0)
-    #                 limite = 1 if ignorar_proprio else 0
-    #                 if qtd_uso > limite:
-    #                     c += P_CHOQUE_PROF * (qtd_uso - limite)
-    #                 return c
-
-    #             # Tenta reparar até 15 conflitos por geração
-    #             amostra_conf = random.sample(conflitos, min(len(conflitos), 15))
-    #             for (turma, idx_1) in amostra_conf:
-    #                 aloc_t = ind[turma]
-    #                 slots_t = slots_por_turma[turma]
-    #                 r_1 = aloc_t[idx_1]
-    #                 d1, a1 = slots_t[idx_1]
-
-    #                 custo_atual_1 = custo_local_slot(turma, r_1, d1, a1, ignorar_proprio=True)
-    #                 if custo_atual_1 == 0:
-    #                     continue
-
-    #                 melhor_idx_2 = None
-    #                 melhor_ganho = 0
-
-    #                 # Testa permutar idx_1 com qualquer outro slot idx_2 da mesma turma
-    #                 candidatos_2 = list(range(len(slots_t)))
-    #                 random.shuffle(candidatos_2)
-
-    #                 for idx_2 in candidatos_2:
-    #                     if idx_2 == idx_1:
-    #                         continue
-    #                     r_2 = aloc_t[idx_2]
-    #                     if r_1 == r_2:
-    #                         continue
-    #                     d2, a2 = slots_t[idx_2]
-
-    #                     custo_antes = custo_atual_1 + custo_local_slot(turma, r_2, d2, a2, ignorar_proprio=True)
-    #                     custo_depois = (
-    #                         custo_local_slot(turma, r_1, d2, a2, ignorar_proprio=False)
-    #                         + custo_local_slot(turma, r_2, d1, a1, ignorar_proprio=False)
-    #                     )
-    #                     ganho = custo_antes - custo_depois
-    #                     if ganho > melhor_ganho:
-    #                         melhor_ganho = ganho
-    #                         melhor_idx_2 = idx_2
-
-    #                 # Se encontrou uma troca que reduz os choques, aplica!
-    #                 if melhor_idx_2 is not None:
-    #                     r_2 = aloc_t[melhor_idx_2]
-    #                     d2, a2 = slots_t[melhor_idx_2]
-    #                     if r_1 is not None:
-    #                         p1 = self.requerimentos[r_1]["professor"]
-    #                         ocup_prof[(p1, d1, a1)] -= 1
-    #                         ocup_prof[(p1, d2, a2)] = ocup_prof.get((p1, d2, a2), 0) + 1
-    #                     if r_2 is not None:
-    #                         p2 = self.requerimentos[r_2]["professor"]
-    #                         ocup_prof[(p2, d2, a2)] -= 1
-    #                         ocup_prof[(p2, d1, a1)] = ocup_prof.get((p2, d1, a1), 0) + 1
-
-    #                     aloc_t[idx_1], aloc_t[melhor_idx_2] = aloc_t[melhor_idx_2], aloc_t[idx_1]
-    #                 elif random.random() < 0.25:
-    #                     # Pequena perturbação aleatória (Mutação Clássica) para escapar de mínimos locais
-    #                     idx_rand = random.randint(0, len(slots_t) - 1)
-    #                     aloc_t[idx_1], aloc_t[idx_rand] = aloc_t[idx_rand], aloc_t[idx_1]
-
-    #             return ind
-
-    #         # ============================================================
-    #         # 5. CICLO EVOLUTIVO (GERAÇÕES)
-    #         # ============================================================
-    #         TAM_POPULACAO = 30
-    #         MAX_GERACOES = 250
-
-    #         populacao = []
-    #         for _ in range(TAM_POPULACAO):
-    #             ind = criar_individuo_inteligente()
-    #             pen, conf = avaliar_individuo(ind)
-    #             populacao.append([pen, ind, conf])
-
-    #         populacao.sort(key=lambda x: x[0])
-    #         melhor_pen, melhor_ind, melhor_conf = populacao[0]
-
-    #         for geracao in range(1, MAX_GERACOES + 1):
-    #             # Critério de parada: Zero choques de professor e Zero folgas invadidas!
-    #             if melhor_pen == 0:
-    #                 break
-
-    #             if geracao % 15 == 0:
-    #                 prog = min(85, 10 + int((geracao / MAX_GERACOES) * 75))
-    #                 self.progresso_var.set(prog)
-    #                 self.lbl_status.config(
-    #                     text=f"Status: Evolução Genética - Geração {geracao}/{MAX_GERACOES} (Conflitos restantes: {len(melhor_conf)})...",
-    #                     bootstyle="info"
-    #                 )
-    #                 if hasattr(self, "root"):
-    #                     self.root.update_idletasks()
-
-    #             nova_pop = [populacao[0], populacao[1]]  # Elitismo: preserva os 2 melhores intactos
-
-    #             while len(nova_pop) < TAM_POPULACAO:
-    #                 # Seleção por Torneio
-    #                 p1 = min(random.sample(populacao[:15], 3), key=lambda x: x[0])[1]
-    #                 p2 = min(random.sample(populacao[:15], 3), key=lambda x: x[0])[1]
-
-    #                 filho = cruzar(p1, p2)
-    #                 _, conf_f = avaliar_individuo(filho)
-    #                 filho = mutar_e_reparar(filho, conf_f)
-    #                 pen_f, conf_f = avaliar_individuo(filho)
-    #                 nova_pop.append([pen_f, filho, conf_f])
-
-    #             populacao = sorted(nova_pop, key=lambda x: x[0])
-    #             if populacao[0][0] < melhor_pen:
-    #                 melhor_pen, melhor_ind, melhor_conf = (
-    #                     populacao[0][0],
-    #                     {t: l[:] for t, l in populacao[0][1].items()},
-    #                     populacao[0][2][:]
-    #                 )
-
-    #         # ============================================================
-    #         # 6. RENDERIZAÇÃO DAS TABELAS E COMPATIBILIDADE COM DASHBOARD
-    #         # ============================================================
-    #         self.progresso_var.set(90)
-    #         self.lbl_status.config(text="Status: A desenhar tabelas...", bootstyle="success")
-
-    #         grade = {}
-    #         alocacoes_ativas = set()
-    #         for turma, aloc_t in melhor_ind.items():
-    #             slots_t = slots_por_turma[turma]
-    #             for idx_s, r_idx in enumerate(aloc_t):
-    #                 if r_idx is not None:
-    #                     d, a = slots_t[idx_s]
-    #                     grade[(turma, d, a)] = r_idx
-    #                     alocacoes_ativas.add((r_idx, d, a))
-
-    #         # Adaptador leve para que `self.atualizar_dashboard(solver, alocacoes, ...)` funcione sem OR-Tools
-    #         class SolverGeneticoAdapter:
-    #             def Value(self, var_key):
-    #                 return 1 if var_key in alocacoes_ativas else 0
-
-    #         alocacoes_mock = {
-    #             (r_idx, d, a): (r_idx, d, a)
-    #             for r_idx, req in enumerate(self.requerimentos)
-    #             for d in range(dias)
-    #             for a in (range(aulas_manha) if eh_manha(req["turma"]) else range(aulas_manha, total_aulas_dia))
-    #         }
-
-    #         self.preparar_tabelas_previa()
-    #         self.tv_previa_manha.delete(*self.tv_previa_manha.get_children())
-    #         self.tv_previa_tarde.delete(*self.tv_previa_tarde.get_children())
-
-    #         turmas_m = self.ordenar_turmas_naturalmente([t for t in self.turmas if eh_manha(t)])
-    #         turmas_t = self.ordenar_turmas_naturalmente([t for t in self.turmas if not eh_manha(t)])
-
-    #         sep_m = ["-" * 10] * (2 + len(turmas_m))
-    #         for d in range(dias):
-    #             dia_nome = self.dias_semana[d] if d < len(self.dias_semana) else f"Dia {d + 1}"
-    #             for a in range(aulas_manha):
-    #                 horario_str = horarios_m[a] if a < len(horarios_m) else f"{a + 1}º Horário"
-    #                 linha = [dia_nome, horario_str]
-    #                 for turma in turmas_m:
-    #                     r_idx = grade.get((turma, d, a))
-    #                     if r_idx is not None:
-    #                         req = self.requerimentos[r_idx]
-    #                         linha.append(f"{req['disciplina']} ({req['professor']})")
-    #                     else:
-    #                         linha.append("---")
-    #                 self.tv_previa_manha.insert("", "end", values=linha)
-    #             if aulas_manha > 0:
-    #                 self.tv_previa_manha.insert("", "end", values=sep_m)
-
-    #         sep_t = ["-" * 10] * (2 + len(turmas_t))
-    #         for d in range(dias):
-    #             dia_nome = self.dias_semana[d] if d < len(self.dias_semana) else f"Dia {d + 1}"
-    #             for a in range(aulas_tarde):
-    #                 global_a = aulas_manha + a
-    #                 horario_str = horarios_t[a] if a < len(horarios_t) else f"{a + 1}º Horário"
-    #                 linha = [dia_nome, horario_str]
-    #                 for turma in turmas_t:
-    #                     r_idx = grade.get((turma, d, global_a))
-    #                     if r_idx is not None:
-    #                         req = self.requerimentos[r_idx]
-    #                         linha.append(f"{req['disciplina']} ({req['professor']})")
-    #                     else:
-    #                         linha.append("---")
-    #                 self.tv_previa_tarde.insert("", "end", values=linha)
-    #             if aulas_tarde > 0:
-    #                 self.tv_previa_tarde.insert("", "end", values=sep_t)
-
-    #         self.progresso_var.set(100)
-    #         self.lbl_status.config(
-    #             text="Status: Concluído via Evolução Genética! (100% das 375 aulas alocadas)",
-    #             bootstyle="success"
-    #         )
-
-    #         self.atualizar_dashboard(SolverGeneticoAdapter(), alocacoes_mock, aulas_manha, total_aulas_dia)
-    #         self.btn_gerar.config(state="normal")
-    #         self.btn_exportar.config(state="normal")
-    #         self.btn_exportar_pdf.config(state="normal")
-
-    #     except Exception as e:
-    #         self.progresso_var.set(0)
-    #         self.lbl_status.config(text="Status: Erro na geração genética.", bootstyle="danger")
-    #         self.btn_gerar.config(state="normal")
-    #         messagebox.showerror("Erro de Execução", f"Ocorreu um erro:\n{str(e)}")    
+                    
                
     def preparar_tabelas_previa(self):
         turmas_manha = self.ordenar_turmas_naturalmente([t for t, turno in self.turmas.items() if turno == "Manhã"])
@@ -1877,6 +1617,30 @@ class AppHorariosPro:
             for indice, _ in enumerate(treeview["columns"])
         ]
 
+    def alterar_zoom_grade(self, incremento):
+        novo_zoom = round(max(0.60, min(1.40, self.zoom_grade + incremento)), 2)
+        self.definir_zoom_grade(novo_zoom)
+
+    def definir_zoom_grade(self, novo_zoom):
+        self.zoom_grade = round(max(0.60, min(1.40, novo_zoom)), 2)
+        if hasattr(self, "lbl_zoom_grade"):
+            self.lbl_zoom_grade.configure(text=f"{int(self.zoom_grade * 100)}%")
+        if hasattr(self, "tv_previa_manha"):
+            self.renderizar_grade_colorida(
+                self.tv_previa_manha,
+                self.canvas_previa_manha,
+            )
+        if hasattr(self, "tv_previa_tarde"):
+            self.renderizar_grade_colorida(
+                self.tv_previa_tarde,
+                self.canvas_previa_tarde,
+            )
+
+    def zoom_mouse_grade(self, event):
+        incremento = 0.10 if event.delta > 0 else -0.10
+        self.alterar_zoom_grade(incremento)
+        return "break"
+
     def cor_professor(self, nome_professor):
         nome_professor = str(nome_professor).strip().upper()
         professores = [nome.upper() for nome in self.professores]
@@ -1906,8 +1670,10 @@ class AppHorariosPro:
             return
 
         larguras = self.larguras_grade(treeview)
-        cabecalho_altura = 30
-        altura_linha = 38
+        zoom = getattr(self, "zoom_grade", 1.0)
+        larguras = [int(largura * zoom) for largura in larguras]
+        cabecalho_altura = int(30 * zoom)
+        altura_linha = int(38 * zoom)
         largura_total = sum(larguras)
         itens = treeview.get_children()
 
@@ -1917,12 +1683,13 @@ class AppHorariosPro:
                 x_atual, 0, x_atual + larguras[indice], cabecalho_altura,
                 fill="#17324d", outline="#d5dde5"
             )
+            tamanho_fonte = max(7, int(8 * zoom))
             canvas.create_text(
                 x_atual + larguras[indice] / 2,
                 cabecalho_altura / 2,
                 text=treeview.heading(coluna)["text"],
                 fill="#FFFFFF",
-                font=("Segoe UI", 7, "bold")
+                font=("Segoe UI", tamanho_fonte, "bold")
             )
             x_atual += larguras[indice]
 
@@ -1964,8 +1731,8 @@ class AppHorariosPro:
                     y_atual + altura_linha / 2,
                     text=texto_linhas,
                     fill=cor_texto,
-                    font=("Segoe UI", 7, "bold" if coluna_idx >= 2 and valor not in ("", "—") else "normal"),
-                    width=largura - 10,
+                    font=("Segoe UI", max(7, int(8 * zoom)), "bold" if coluna_idx >= 2 and valor not in ("", "—") else "normal"),
+                    width=max(40, largura - int(10 * zoom)),
                     justify="center"
                 )
                 x_atual += largura
@@ -2020,17 +1787,38 @@ class AppHorariosPro:
         self.horarios_t_custom = [ent.get() for ent in self.entradas_t]
         janela.destroy()
 
-    def criar_card_dashboard(self, parent, titulo, valor, coluna):
-        card = ttk.Labelframe(parent, text=titulo, bootstyle="secondary", padding=(10, 8))
+    def criar_card_dashboard(self, parent, titulo, valor, coluna, bootstyle):
+        card = ttk.Labelframe(
+            parent,
+            text=titulo,
+            bootstyle=bootstyle,
+            padding=(10, 10)
+        )
         card.grid(row=0, column=coluna, sticky="nsew", padx=5)
         label = ttk.Label(
             card,
             text=valor,
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 20, "bold"),
             anchor="center"
         )
         label.pack(fill="both", expand=True)
         return label
+
+    def rolar_dashboard_com_mouse(self, event):
+        canvas = getattr(self, "canvas_dashboard", None)
+        if canvas is None:
+            return
+
+        widget_path = str(event.widget)
+        canvas_path = str(canvas)
+        if widget_path != canvas_path and not widget_path.startswith(canvas_path + "."):
+            return
+
+        unidades = int(-event.delta / 120)
+        if unidades == 0:
+            unidades = -1 if event.delta > 0 else 1
+        canvas.yview_scroll(unidades, "units")
+        return "break"
 
     def atualizar_card_dashboard(self, label, valor):
         if hasattr(label, "configure"):
@@ -2069,11 +1857,12 @@ class AppHorariosPro:
                 canvas.configure(scrollregion=(0, 0, 0, 0))
                 return
 
-            largura_dia = 90
-            largura_horario = 150
-            largura_turma = 190
-            altura_cabecalho = 32
-            altura_linha = 38
+            zoom = self.zoom_grade_individual
+            largura_dia = max(1, int(90 * zoom))
+            largura_horario = max(1, int(150 * zoom))
+            largura_turma = max(1, int(190 * zoom))
+            altura_cabecalho = max(1, int(32 * zoom))
+            altura_linha = max(1, int(38 * zoom))
             larguras = [largura_dia, largura_horario] + [
                 largura_turma for _ in colunas[2:]
             ]
@@ -2092,7 +1881,7 @@ class AppHorariosPro:
                     altura_cabecalho / 2,
                     text=treeview.heading(coluna)["text"],
                     fill="#ffffff",
-                    font=("Segoe UI", 8, "bold")
+                    font=("Segoe UI", max(6, round(8 * zoom)), "bold")
                 )
                 x_atual += largura
 
@@ -2136,7 +1925,7 @@ class AppHorariosPro:
                             y + altura_linha / 2,
                             text=texto,
                             fill=cor_texto,
-                            font=("Segoe UI", 8, "bold"),
+                            font=("Segoe UI", max(6, round(8 * zoom)), "bold"),
                             width=largura - 12,
                             justify="center"
                         )
@@ -2157,6 +1946,26 @@ class AppHorariosPro:
             self.lbl_carga_individual.configure(
                 text=f"{carga_total} aula(s) na semana"
             )
+
+    def alterar_zoom_grade_individual(self, incremento):
+        novo_zoom = round(
+            max(0.60, min(1.40, self.zoom_grade_individual + incremento)),
+            2
+        )
+        self.definir_zoom_grade_individual(novo_zoom)
+
+    def definir_zoom_grade_individual(self, novo_zoom):
+        self.zoom_grade_individual = round(max(0.60, min(1.40, novo_zoom)), 2)
+        if hasattr(self, "lbl_zoom_grade_individual"):
+            self.lbl_zoom_grade_individual.configure(
+                text=f"{int(self.zoom_grade_individual * 100)}%"
+            )
+        self.atualizar_horario_individual()
+
+    def zoom_mouse_grade_individual(self, event):
+        incremento = 0.10 if event.delta > 0 else -0.10
+        self.alterar_zoom_grade_individual(incremento)
+        return "break"
 
     def desenhar_grafico_carga(self, dados):
         canvas = getattr(self, "canvas_carga_professores", None)
@@ -2407,6 +2216,7 @@ class AppHorariosPro:
             total_aulas_grade += total_aulas
             total_penalidades += aulas_penalizadas
 
+        self.tv_dash.configure(height=max(1, len(dados_dashboard)))
         perfeitos = sum(1 for item in dados_dashboard if item["penalidades"] == 0)
 
         self.atualizar_card_dashboard(
